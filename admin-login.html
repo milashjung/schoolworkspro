@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>SchoolWorksPro Admin Login</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            background: #f4f6fb;
+        }
+
+        .login-box {
+            width: 100%;
+            max-width: 420px;
+            background: white;
+            padding: 35px;
+            border-radius: 18px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.10);
+        }
+
+        .logo {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 20px;
+            background: #3326a8;
+            color: white;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 22px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #777;
+            margin-bottom: 30px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 7px;
+            font-weight: 600;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 18px;
+            font-size: 15px;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            background: #3326a8;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+        }
+
+        .message {
+            display: none;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 18px;
+            font-size: 14px;
+        }
+
+        .error {
+            background: #ffe8e8;
+            color: #b42318;
+        }
+
+        .success {
+            background: #e8f8ef;
+            color: #16794c;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="login-box">
+
+    <div class="logo">SW</div>
+
+    <h1>SchoolWorksPro</h1>
+
+    <div class="subtitle">
+        Admin Support Dashboard
+    </div>
+
+    <div id="errorMessage" class="message error"></div>
+
+    <div id="successMessage" class="message success">
+        Login successful. Opening dashboard...
+    </div>
+
+    <form id="loginForm">
+
+        <label>Email Address</label>
+
+        <input
+            type="email"
+            id="email"
+            placeholder="Enter admin email"
+            required
+        >
+
+        <label>Password</label>
+
+        <input
+            type="password"
+            id="password"
+            placeholder="Enter password"
+            required
+        >
+
+        <button id="loginButton" type="submit">
+            Login
+        </button>
+
+    </form>
+
+</div>
+
+
+<script type="module">
+
+    // ==========================================
+    // FIREBASE IMPORTS
+    // ==========================================
+
+    import {
+        initializeApp
+    } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+
+    import {
+        getAuth,
+        signInWithEmailAndPassword,
+        signOut,
+        onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+
+    import {
+        getFirestore,
+        doc,
+        getDoc
+    } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+
+    // ==========================================
+    // FIREBASE CONFIG
+    // ==========================================
+
+    const firebaseConfig = {
+
+        apiKey: "AIzaSyC35OAfNgFm4fsg-g4wSNHW9kg8f5Q34MY",
+
+        authDomain:
+            "schoolworkspro-bb371.firebaseapp.com",
+
+        databaseURL:
+            "https://schoolworkspro-bb371-default-rtdb.firebaseio.com",
+
+        projectId:
+            "schoolworkspro-bb371",
+
+        storageBucket:
+            "schoolworkspro-bb371.firebasestorage.app",
+
+        messagingSenderId:
+            "501717012633",
+
+        appId:
+            "1:501717012633:web:a877490633f9a3b5e2e808",
+
+        measurementId:
+            "G-ZQT318ZKQG"
+    };
+
+
+    // ==========================================
+    // INITIALIZE FIREBASE
+    // ==========================================
+
+    const app = initializeApp(firebaseConfig);
+
+    const auth = getAuth(app);
+
+    const db = getFirestore(app);
+
+
+    // ==========================================
+    // HTML ELEMENTS
+    // ==========================================
+
+    const loginForm =
+        document.getElementById("loginForm");
+
+    const loginButton =
+        document.getElementById("loginButton");
+
+    const errorMessage =
+        document.getElementById("errorMessage");
+
+    const successMessage =
+        document.getElementById("successMessage");
+
+
+    // ==========================================
+    // SHOW ERROR
+    // ==========================================
+
+    function showError(message) {
+
+        errorMessage.textContent = message;
+
+        errorMessage.style.display = "block";
+
+        successMessage.style.display = "none";
+    }
+
+
+    // ==========================================
+    // CHECK ADMIN
+    // ==========================================
+
+    async function verifyAdmin(user) {
+
+        try {
+
+            const adminRef =
+                doc(db, "admins", user.uid);
+
+            const adminSnapshot =
+                await getDoc(adminRef);
+
+
+            if (!adminSnapshot.exists()) {
+
+                console.error(
+                    "Admin document does not exist."
+                );
+
+                await signOut(auth);
+
+                showError(
+                    "Access denied. You are not an authorized administrator."
+                );
+
+                return false;
+            }
+
+
+            const adminData =
+                adminSnapshot.data();
+
+
+            if (adminData.role !== "admin") {
+
+                await signOut(auth);
+
+                showError(
+                    "Access denied. Administrator permission is required."
+                );
+
+                return false;
+            }
+
+
+            console.log(
+                "Admin verified:",
+                user.email
+            );
+
+            console.log(
+                "Admin UID:",
+                user.uid
+            );
+
+            return true;
+
+        } catch (error) {
+
+            console.error(
+                "Admin verification error:",
+                error
+            );
+
+            await signOut(auth);
+
+            showError(
+                "Unable to verify admin permission."
+            );
+
+            return false;
+        }
+    }
+
+
+    // ==========================================
+    // LOGIN
+    // ==========================================
+
+    loginForm.addEventListener(
+        "submit",
+        async function(event) {
+
+            event.preventDefault();
+
+            errorMessage.style.display = "none";
+
+            loginButton.disabled = true;
+
+            loginButton.textContent =
+                "Checking...";
+
+
+            const email =
+                document
+                    .getElementById("email")
+                    .value
+                    .trim();
+
+            const password =
+                document
+                    .getElementById("password")
+                    .value;
+
+
+            try {
+
+                // Firebase Authentication
+                const credential =
+                    await signInWithEmailAndPassword(
+                        auth,
+                        email,
+                        password
+                    );
+
+
+                const user =
+                    credential.user;
+
+
+                console.log(
+                    "Firebase login successful."
+                );
+
+                console.log(
+                    "UID:",
+                    user.uid
+                );
+
+
+                // Verify admin permission
+                const isAdmin =
+                    await verifyAdmin(user);
+
+
+                if (!isAdmin) {
+
+                    loginButton.disabled = false;
+
+                    loginButton.textContent =
+                        "Login";
+
+                    return;
+                }
+
+
+                // Success
+                successMessage.style.display =
+                    "block";
+
+                errorMessage.style.display =
+                    "none";
+
+
+                // Go to admin dashboard
+                setTimeout(() => {
+
+                    window.location.href =
+                        "admin.html";
+
+                }, 700);
+
+
+            } catch (error) {
+
+                console.error(
+                    "Login error:",
+                    error
+                );
+
+
+                let message =
+                    "Unable to login.";
+
+
+                switch (error.code) {
+
+                    case "auth/invalid-credential":
+
+                        message =
+                            "Invalid email or password.";
+
+                        break;
+
+
+                    case "auth/invalid-email":
+
+                        message =
+                            "Please enter a valid email address.";
+
+                        break;
+
+
+                    case "auth/user-disabled":
+
+                        message =
+                            "This administrator account has been disabled.";
+
+                        break;
+
+
+                    case "auth/too-many-requests":
+
+                        message =
+                            "Too many failed login attempts. Please try again later.";
+
+                        break;
+
+
+                    default:
+
+                        message =
+                            error.message;
+                }
+
+
+                showError(message);
+
+
+                loginButton.disabled = false;
+
+                loginButton.textContent =
+                    "Login";
+            }
+
+        }
+    );
+
+
+    // ==========================================
+    // CHECK EXISTING LOGIN
+    // ==========================================
+
+    onAuthStateChanged(
+        auth,
+        async (user) => {
+
+            if (!user) {
+                return;
+            }
+
+
+            const isAdmin =
+                await verifyAdmin(user);
+
+
+            if (isAdmin) {
+
+                window.location.href =
+                    "admin.html";
+            }
+
+        }
+    );
+
+</script>
+
+</body>
+</html>
